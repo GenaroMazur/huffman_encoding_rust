@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io::Read;
+use crate::bit_reader::BitReader;
 
 #[derive(Debug)]
 pub struct HuffmanNode {
@@ -18,7 +20,7 @@ impl HuffmanNode {
         }
     }
 
-    pub fn create_node(byte: u8, weight: u32) -> Self {
+    fn create_node(byte: u8, weight: u32) -> Self {
         let mut node = Self::new();
 
         node.byte = byte;
@@ -70,25 +72,49 @@ impl HuffmanNode {
         self.right = Some(Box::new(right));
     }
 
-    pub fn get_dictionary(&self, v: u16) -> HashMap<u8, u16> {
+    pub fn get_dictionary(&self, v: Option<u16>) -> HashMap<u8, u16> {
         let mut dictionary = HashMap::new();
 
         if self.is_leaf() {
-            dictionary.insert(self.byte, v);
+            if v.is_some() {
+                dictionary.insert(self.byte, v.unwrap());
+            }
         }
 
         if self.left.is_some() {
-            let left_v = v << 1;
-            let left_dictionary = self.left.as_ref().unwrap().get_dictionary(left_v);
+            let left_v = if v.is_some() { v.unwrap() << 1 } else { 0 };
+            let left_dictionary = self.left.as_ref().unwrap().get_dictionary(Some(left_v));
             dictionary.extend(left_dictionary);
         }
 
         if self.right.is_some() {
-            let right_v = v << 1 | 1;
-            let right_dictionary = self.right.as_ref().unwrap().get_dictionary(right_v);
+            let right_v = if v.is_some() { v.unwrap() << 1 | 1 } else { 1 };
+            let right_dictionary = self.right.as_ref().unwrap().get_dictionary(Some(right_v));
             dictionary.extend(right_dictionary);
         }
 
         dictionary
+    }
+
+    pub fn decode_byte<R: Read>(&self, bit_reader: &mut BitReader<R>) -> Option<u8> {
+        if self.is_leaf() {
+            return Some(self.byte);
+        }
+        
+        let bit = bit_reader.read_bit()?;
+
+        if bit == 0 {
+            if let Some(ref left_node) = self.left {
+                left_node.decode_byte(bit_reader)
+            } else {
+                None
+            }
+        } else {
+            if let Some(ref right_node) = self.right {
+                right_node.decode_byte(bit_reader)
+            } else {
+                None
+            }
+        }
     }
 }

@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::io::Read;
+
 pub enum Command {
     Compress,
     Decompress,
@@ -43,4 +46,27 @@ pub fn validate_file(filename: String, command: Command) {
             }
         }
     }
+}
+
+pub fn read_header<R: Read>(reader: &mut R) -> HashMap<u8, i32> {
+    let mut freq = HashMap::new();
+
+    let mut num_symbols_buf = [0u8; 2];
+    reader.read_exact(&mut num_symbols_buf).unwrap();
+    let num_symbols = u16::from_le_bytes(num_symbols_buf);
+
+    for _ in 0..num_symbols {
+        let mut byte_buf = [0u8; 1];
+        let mut count_buf = [0u8; 4];
+
+        reader.read_exact(&mut byte_buf).unwrap();
+        reader.read_exact(&mut count_buf).unwrap();
+
+        let byte = byte_buf[0];
+        let count = u32::from_le_bytes(count_buf) as i32;
+
+        freq.insert(byte, count);
+    }
+
+    freq
 }
